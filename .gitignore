@@ -1,0 +1,4 @@
+.env
+.venv/
+run.bat
+reminders.db

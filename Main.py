@@ -42,7 +42,7 @@ def send_reminder():
                     if repeat_day == "True":
                         new_date = now + timedelta(days=7)
                         cursor.execute("UPDATE reminders SET date = ? WHERE user_id = ? AND alert = ?",
-                                       (new_date.strftime("%Y.%m.%d"), user_id, alert))  # Date with dots
+                                       (new_date.strftime("%Y.%m.%d"), user_id, alert))  
                     else:
                         cursor.execute("DELETE FROM reminders WHERE user_id = ? AND alert = ?", (user_id, alert))
                     conn.commit()
@@ -87,14 +87,14 @@ def handle_message(message):
         return
     if user_id in user_states:
         if user_states[user_id] == "alert":
-            user_states[user_id + 1000] = message.text  # Store alert message
+            user_states[user_id + 1000] = message.text  
             bot.send_message(user_id, "Введите дату в формате: день.месяц.год\nПример: 15.12.2024")
             user_states[user_id] = "date"
         elif user_states[user_id] == "date":
             try:
                 day, month, year = map(int, message.text.replace(' ', '').split('.'))
                 date = datetime.datetime(year, month, day).strftime("%Y.%m.%d")
-                user_states[user_id + 2000] = date  # Store date
+                user_states[user_id + 2000] = date 
                 bot.send_message(user_id, "Введите время в формате: часы:минуты\nПример: 15:30")
                 user_states[user_id] = "time"
             except ValueError:
@@ -111,6 +111,50 @@ def handle_message(message):
                 bot.send_message(user_id, "Выберите опцию:", reply_markup=markup)
             except ValueError:
                 bot.send_message(user_id, "Неправильный формат времени!")
+
+
+def cleanup_reminders():
+    while True:
+        local_conn = None
+        try:
+            local_conn = sqlite3.connect('reminders.db')
+            local_cursor = local_conn.cursor()
+            
+            timezone = pytz.timezone("Europe/Moscow")
+            now = datetime.datetime.now(timezone)
+            
+            local_cursor.execute("SELECT * FROM reminders WHERE date < ?", 
+                               (now.strftime("%Y.%m.%d"),))
+            expired_reminders = local_cursor.fetchall()
+            
+            for reminder in expired_reminders:
+                user_id, alert, date_str, time_str, repeat_day = reminder
+                
+                if repeat_day == "True":
+                    date_obj = datetime.datetime.strptime(date_str, "%Y.%m.%d")
+                    new_date_obj = date_obj + timedelta(days=7)
+                    new_date_str = new_date_obj.strftime("%Y.%m.%d")
+                    
+                    local_cursor.execute("UPDATE reminders SET date = ? WHERE user_id = ? AND alert = ?", (new_date_str, user_id, alert))
+                else:
+                    local_cursor.execute("DELETE FROM reminders WHERE user_id = ? AND alert = ?", 
+                                      (user_id, alert))
+            
+            local_conn.commit()
+            logging.info("Проверка просроченных напоминаний завершена")
+            
+        except Exception as e:
+            logging.error(f"Ошибка при очистке напоминаний: {e}", exc_info=True)
+        finally:
+            if local_conn:
+                local_conn.close()
+                
+        time.sleep(86400)
+
+
+cleanup_thread = threading.Thread(target=cleanup_reminders)
+cleanup_thread.daemon = True
+cleanup_thread.start()
 
 
 @bot.callback_query_handler(func=lambda call: True)

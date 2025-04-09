@@ -32,6 +32,19 @@ def send_reminder():
         try:            
             timezone = pytz.timezone("Europe/Moscow")
             now = datetime.datetime.now(timezone)
+            
+            ten_minutes_before = now + timedelta(minutes=10)
+            cursor.execute("SELECT * FROM reminders WHERE date = ? AND time = ?", 
+                           (ten_minutes_before.strftime("%Y.%m.%d"), ten_minutes_before.strftime("%H:%M")))
+            rows_10_min = cursor.fetchall()
+
+            for row in rows_10_min:
+                user_id, alert, _, _, repeat_day = row
+                try:
+                    bot.send_message(user_id, f"Напоминание через 10 минут: {alert}")
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке уведомления за 10 минут пользователю {user_id}: {e}", exc_info=True)
+
             cursor.execute("SELECT * FROM reminders WHERE date = ? AND time = ?",
                            (now.strftime("%Y.%m.%d"), now.strftime("%H:%M")))
             rows = cursor.fetchall()
@@ -50,7 +63,7 @@ def send_reminder():
                     logging.error(f"Ошибка при отправке напоминания пользователю {user_id}: {e}", exc_info=True)
         except Exception as e:
             logging.error(f"Ошибка при проверке базы данных: {e}", exc_info=True)
-        time.sleep(30)
+        time.sleep(45)
 
 
 thread = threading.Thread(target=send_reminder)
@@ -128,7 +141,7 @@ def cleanup_reminders():
             expired_reminders = local_cursor.fetchall()
             
             for reminder in expired_reminders:
-                user_id, alert, date_str, time_str, repeat_day = reminder
+                user_id, alert, date_str, repeat_day = reminder
                 
                 if repeat_day == "True":
                     date_obj = datetime.datetime.strptime(date_str, "%Y.%m.%d")

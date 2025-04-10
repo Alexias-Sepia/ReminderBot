@@ -13,6 +13,12 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
+def log_user_action(user_id, action):
+    with open("user_actions.log", "a") as log_file:
+        log_file.write(f"{datetime.datetime.now()} - Пользователь {user_id}: {action}\n")
+
+
 load_dotenv()
 TOKEN = os.getenv("API_TOKEN")
 if not TOKEN:
@@ -180,6 +186,7 @@ def callback_inline(call):
         alert = user_states.get(user_id + 1000)
         date = user_states.get(user_id + 2000)
         time_str = user_states.get(user_id + 3000)
+        log_user_action(user_id, f"Добавлено напоминание: {alert}, дата: {date}, время: {time_str}")
         cursor.execute("INSERT INTO reminders (user_id, alert, date, time, repeat_day) VALUES (?, ?, ?, ?, ?)", (user_id, alert, date, time_str, repeat_day))
         conn.commit()
         del user_states[user_id]

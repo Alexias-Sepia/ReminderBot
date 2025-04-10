@@ -2,3 +2,4 @@
 .venv/
 run.bat
 reminders.db
+user_actions.log
